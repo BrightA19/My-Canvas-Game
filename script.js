@@ -1,244 +1,221 @@
 // By Bright A.
 
 // Declare all variables
-// the {} are used for neatness in coding workspaces
-{
-var canvas = window.onload = document.getElementById("canvas");
+var canvas = document.getElementById("canvas");
+var nightMode = false;
 var ctx = canvas.getContext("2d");
-var width = canvas.width,
-  height = canvas.height;
-var saveColor = [lnColor(), lnColor()];
-var player = new Sprite();
-var box = [];
-var speed = 6;
-var score = 0;
-var touch = [1, false];
-var startIt = [false, undefined];
-var init = document.getElementById("start");
-}
+var interval, speed, score;
+var color = "#008";
+var started = false;
+var paused = false;
+var prev = Date.now();
+var frame = 0;
 
-// Create two 'enemy box'
-for (var i = 0; i < 2; i++) {
-  box.push(new Sprite());
-  box[i].x = 0;
-  box[i].y = -130;
-  box[i].width = 128;
-  box[i].height = 130;
-}
+// Create player box
+var player = {
+    x: 145,
+    y: 520,
+    size: 100,
+    color: "darkblue"
+};
 
-// Create two lines
-function lines() {
-  ctx.moveTo(130, 0);
-  ctx.lineTo(130, height);
-  ctx.moveTo(260, 0);
-  ctx.lineTo(260, height);
-  ctx.lineWidth = 1;
-  ctx.strokeStyle = "darkblue";
-  ctx.stroke();
-}
+// Create array for enemy boxes
+var enemies = [];
 
-// Find the key the user is pressing and modify player.x
-addEventListener("keydown", function(e) {
-  switch (e.keyCode) {
-    case 37:
-      if (player.x > 15) {
-        player.x -= 130;
-      }
-      break;
-    case 39:
-      if (player.x < 275) {
-        player.x += 130;
-      }
-      break;
-    default:
-      player.x = player.x;
-      break;
-  }
+
+// When the user presses a key ...
+window.addEventListener("keydown", function(e) {
+    
+    // Find the key the user is pressing and modify player.x
+    if (started && !paused) {
+        if (e.keyCode == 65 || e.keyCode == 37) { // Left Arrow or A key
+            if (player.x > 15) player.x -= 130;
+        }  
+        if (e.keyCode == 68 || e.keyCode == 39) { // Right Arrow or D key
+            if (player.x < 275) player.x += 130;
+        }
+    }
+    
+    // Calls 'space' function, which handles starting and pausing the game
+    if (e.keyCode == 32) {
+        space();
+        e.preventDefault();
+    }
+    
+    // Turn night mode on or off and adjust display accordingly (HTML5)
+    if (e.keyCode == 66) { // B key
+        nightMode = !nightMode;
+        color = (nightMode) ? "#88F" : "#008";
+        
+        if (nightMode) {
+            document.body.style.background = "#000";
+            canvas.style.background = "#222";
+        }
+        else {
+            document.body.style.background = "#FFF";
+            canvas.style.background = "#DDD";
+        }
+        
+        canvas.style.borderColor = color;
+        canvas.style.boxShadow = "0 0 20px" + color;
+        document.getElementsByTagName("h1")[0].style.color = color;
+        document.getElementsByTagName("p")[0].style.color = color;
+    }
+    
 });
 
-// Create random hex color (returns value when called)
-function lnColor() {
-  
-  // Create variable hex and push random numbers and letters
-  var hex = [];
-  for (var i = 0; i < 6; i++) {
-    var color = Math.floor(Math.random() * 13);
-    switch (color) {
-      case 7:
-        hex.push("a");
-        break;
-      case 8:
-        hex.push("b");
-        break;
-      case 9:
-        hex.push("c");
-        break;
-      case 10:
-        hex.push("d");
-        break;
-      case 11:
-        hex.push("e");
-        break;
-      case 12:
-        hex.push("f");
-        break;
-      default:
-        hex.push(color);
-        break;
-    }
-  }
-  
-  // Return all values in hex in HEX color form
-  return "#" + hex[0] + hex[1] +
-    hex[2] + hex[3] + hex[4] + hex[5]; 
-}
+// Pause if user switches tabs, windows, etc
+window.addEventListener("blur", function () {
+    if (started && !paused) space();
+});
 
-// Create randon x Coords onto the three slots (returns value when called)
+// Randomly returns an 'x' position for enemy boxes
 function xPos() {
-  var x = Math.ceil(Math.random() * 3);
-  switch (x) {
-    case 1:
-      return 0 + 1;
-    case 2:
-      return 131;
-    case 3:
-      return 261;
-  }
+    switch (Math.ceil(Math.random() * 3)) {
+        case 1:
+            return 1;
+        case 2:
+            return 131;
+        case 3:
+            return 261;
+    }
 }
 
-// Clear lanes (DOES NOT clear two lines)
-function clear() {
-  ctx.clearRect(0, 0, 129, height);
-  ctx.clearRect(131, 0, 128, height);
-  ctx.clearRect(261, 0, 129, height);
+// Basic properties of enemy
+function Enemy() {
+    this.size = 128;
+    this.x = xPos();
+    this.y = -this.size;
+    this.color = "hsl(" + Math.floor(Math.random() * 359) + ", 100%, 50%)";
 }
 
-// Basic properties of box and player
-function Sprite() {
-  this.x = (width / 2) - 50;
-  this.y = height - 130;
-  this.width = 100;
-  this.height = 100;
-}
+// Update both enemy boxes
+Enemy.update = function () {
+    for (var i in enemies) {
+        // Create a new box
+        if (enemies[i].y > canvas.height) {
+            enemies[i] = new Enemy();
+            score += 0.5;
+        }
+        // Or just move the box
+        else {
+            enemies[i].y += speed;
+        }
+    }
+};
 
-// Reset the game when executed (Alse start up game)
-function reset() {
-
-  //Reset variables
-  player = new Sprite();
-  speed = 6;
-  score = 0;
-  touch[1] = false;
-  box[0].y = -130;
-  box[1].y = -130;
-  lines();
-  clearInterval(startIt[1]);
-  startIt[0] = false;
-
-  //Start the game
-  startIt[1] = setInterval(update, 10);
-  startIt[0] = true;
+// Handles starting and pausing the game
+function space() {
+    
+    if (started) {
+        if (paused) {
+            paused = false;
+            interval = setInterval(update, 1000 / 60);
+            frame = 0;
+            prev = Date.now();
+        }
+        else {
+            // Draws a pause screen
+            ctx.save();
+            ctx.globalAlpha = 0.5;
+            ctx.fillStyle = (nightMode) ? "#000" : "#FFF";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.textAlign = "center";
+            ctx.font = "20px Arial";
+            ctx.fillStyle = (nightMode) ? "#FFF" : "#000";
+            ctx.fillText("Paused", canvas.width / 2, canvas.height / 2);
+            ctx.restore();
+            
+            paused = true;
+            clearInterval(interval);
+        }
+    }
+    else {
+        // Reset variables
+        player.x = 145;
+        speed = 4;
+        score = 0;
+        frame = 0;
+        prev = Date.now();
+        
+        // Reset enemy boxes
+        for (var i = 0; i < 2; i++)
+            enemies[i] = new Enemy();
+        
+        started = true;
+        interval = setInterval(update, 1000 / 60);
+    }
+    
 }
 
 // The game mechanics
 function update() {
-  // To prevent leftover shapes
-  clear();
-
-  // Create player
-  ctx.fillStyle = "darkblue";
-  ctx.fillRect(player.x, player.y, player.width, player.height);
-
-  // Create box
-  for (var i in box) {
-    if (box[i].y > height) {
-      box[i].x = xPos();
-      saveColor[i] = lnColor();
-      ctx.fillStyle = saveColor[i];
-      box[i].y = -130;
-      ctx.fillRect(box[i].x, box[i].y, box[i].width, box[i].height);
-    } else {
-      ctx.fillStyle = saveColor[i];
-      ctx.fillRect(box[i].x, box[i].y, box[i].width, box[i].height);
-      box[i].y += speed;
+    
+    // FPS calculation
+    if (Date.now() - prev >= 1000) {
+        console.log(frame + " FPS");
+        prev = Date.now();
+        frame = 0;
     }
-  }
+    else frame++;
+    
+    
+    // Update enemy boxes
+    Enemy.update();
+    
+    // Check positions
+    for (var i in enemies) {
+        
+        // Stop game if player touches enemy
+        if (player.x < enemies[i].x + enemies[i].size &&
+            player.y < enemies[i].y + enemies[i].size &&
+            enemies[i].x < player.x + player.size &&
+            enemies[i].y < player.y + player.size)
+        {
+            // Stops the game
+            started = false;
+            clearInterval(interval);
+        }
+        
+    }
+    
+    // Change speed based on score
+    if (score <= 120)
+        speed = (score / 10) + 5;
+    
+    
+    // Clear the screen
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.globalAlpha = 1;
+    
+    // Draw two lines
+    ctx.beginPath();
+    ctx.moveTo(130, 0);
+    ctx.lineTo(130, canvas.height);
+    ctx.moveTo(260, 0);
+    ctx.lineTo(260, canvas.height);
+    ctx.closePath();
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = color;
+    ctx.stroke();
 
-  // Check if player and box are touching
-  if (
-    (
-      player.x < box[0].x + box[0].width &&
-      player.y < box[0].y + box[0].height &&
-      box[0].x < player.x + player.width &&
-      box[0].y < player.y + player.height
-    ) ||
-    (
-      player.x < box[1].x + box[1].width &&
-      player.y < box[1].y + box[1].height &&
-      box[1].x < player.x + player.width &&
-      box[1].y < player.y + player.height
-    )
-  ) {
-    touch[1] = true;
-    console.log("Touched: " + touch[0]++);
-    clearInterval(startIt[1]);
-    startIt[0] = false;
-  }
-
-  // Score
-  if (!touch[1] && box[0].y > height && box[1].y > height) {
-    score++;
-    console.log(score);
-    console.log("Speed: " + speed);
-  }
-  ctx.font = "40px Comic Sans MS";
-  ctx.fillStyle = "white";
-  ctx.textAlign = "center";
-  ctx.fillText(score, player.x + (player.width / 2) - 2, player.y + (player.height / 2) + 15);
-
-  // Increase the speed
-  switch (score) {
-    case 5:
-      speed = 6.5;
-      break;
-    case 10:
-      speed = 7.0;
-      break;
-    case 15:
-      speed = 7.5;
-      break;
-    case 20:
-      speed = 8.0;
-      break;
-    case 25:
-      speed = 8.5;
-      break;
-    case 30:
-      speed = 9.0;
-      break;
-    case 35:
-      speed = 9.5;
-      break;
-    case 40:
-      speed = 10.0;
-      break;
-    case 45:
-      speed = 10.5;
-      break;
-    case 50:
-      speed = 11.0;
-      break;
-    case 55:
-      speed = 11.5;
-      break;
-    case 60:
-      speed = 12.0;
-      break;
-  }
-  
-  // To change the button that was clicked
-  init.innerHTML = "Restart Game";
+    // Draw player box
+    ctx.fillStyle = color;
+    ctx.fillRect(player.x, player.y, player.size, player.size);
+    
+    // Draw enemy boxes
+    for (i in enemies) {
+        ctx.fillStyle = enemies[i].color;
+        ctx.fillRect(enemies[i].x, enemies[i].y, enemies[i].size, enemies[i].size);
+    }
+    
+    // Draw score
+    ctx.font = "40px Comic Sans MS";
+    ctx.fillStyle = (nightMode) ? "#000" : "#FFF";
+    ctx.textAlign = "center";
+    ctx.fillText(
+        score, player.x + (player.size / 2),
+        player.y + (player.size / 2) + 15
+    );
+    
 }
-
-// When button is clicked, then 'reset' executes
-init.onclick = reset;
